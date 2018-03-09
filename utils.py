@@ -1,17 +1,9 @@
 
 # coding: utf-8
-
-# In[1]:
-
-
 import pandas as pd
 import numpy as np
 from datetime import timedelta
 import os
-
-
-# In[2]:
-
 
 def load_data(resave=False):
     """
@@ -29,21 +21,6 @@ def load_data(resave=False):
         train.to_hdf('data/data.hdf', 'train')
         test.to_hdf('data/data.hdf', 'test')
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
-
-
-# In[3]:
-
-
-get_ipython().run_cell_magic('time', '', 'train, test = load_data()')
-
-
-# In[4]:
-
-
-train['date'] = pd.to_datetime(train.date)
-
-
-# In[5]:
 
 
 def calculate_target(train, offset=0):
@@ -64,10 +41,6 @@ def calculate_target(train, offset=0):
     target.loc[users] = 1
     return X_train, target
 
-
-# In[6]:
-
-
 def train_test_split(X_train, y_train, train_size=0.75):
     if train_size < 1:
         train_size = int(X_train.id.nunique() * train_size)
@@ -79,14 +52,6 @@ def train_test_split(X_train, y_train, train_size=0.75):
 
 # Example usage:
 
-# In[7]:
-
-
 #X_train, y_train = calculate_target(train, offset=0)
-
-
-# In[8]:
-
-
 #X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train)
 
