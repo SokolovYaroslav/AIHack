@@ -37,9 +37,10 @@ def calculate_target(train, offset=0):
     #or aggregate by sum_b, see if the same
     users = np.intersect1d(users, X_train.id.unique())
     
-    target = pd.Series(np.zeros((X_train.id.nunique())), index=X_train.id.unique())
-    target.loc[users] = 1
+    target = pd.Series(np.ones((X_train.id.nunique())), index=X_train.id.unique())
+    target.loc[users] = 0
     return X_train, target
+
 
 def train_test_split(X_train, y_train, train_size=0.75):
     if train_size < 1:
