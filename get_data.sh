@@ -1,5 +1,3 @@
-#!src/bash
-
 #!/bin/bash
 
 mkdir data
