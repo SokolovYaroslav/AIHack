@@ -10,15 +10,14 @@ from datetime import timedelta
 from datetime import datetime
 import os
 import math
+from scipy import stats
+from sklearn.metrics import roc_auc_score
 
 def log(x):
     if x < 0:
         return -log(-x)
     else: 
         return math.log(x + 1)
-
-# In[2]:
-
 
 def load_data(resave=False, points=True, sort=False):
     """
@@ -51,6 +50,13 @@ def load_data(resave=False, points=True, sort=False):
         train.to_hdf('data/data.hdf', 'train')
         test.to_hdf('data/data.hdf', 'test')
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
+
+def save_to(train, test, path):
+    train.to_hdf(path, 'train')
+    test.to_hdf(path, 'test')
+    
+def load_from(path):
+    return pd.read_hdf(path, 'train'), pd.read_hdf(path, 'test')
 
 def add_features(train, test):
     # Number of first dates of a user
@@ -192,26 +198,23 @@ def cross_val(clf, X_train, aggregate_func, return_proba=False,
 def unique_cnt(series):
     return series.unique().shape[0]
 
-mode_func = lambda x: stats.mode(x).mode[0]
-
-def get_aggregate(df):
-    return df.groupby('id')[['v_l', 'q', 'sum_b', 'location', 'code', 'percent', 'type', 'month',\
+def aggregate(df, take_values=True):
+    mode = lambda x: stats.mode(x).mode[0]
+    num_features = ['min', 'max', 'median', 'sum']
+    cat_features = [unique_cnt, 'min', 'max', mode]
+    
+    res = df.groupby('id')[['v_l', 'q', 'sum_b', 'location', 'code', 'percent', 'type', 'month',\
                             'weekday', 'code_azs','region', 'code1', 'oil_price', 'cur_points']].agg({
-    'v_l':['min', 'max', 'median', 'sum'],
-    'q':['min', 'max', 'median', 'sum'],
-    'sum_b':['min', 'max', 'median', 'sum'],
-    'location':[unique_cnt, 'min', 'max', mode_func],
+    'v_l':num_features, 'q':num_features, 'sum_b':num_features, 'percent':num_features, 
+    'location':cat_features,'type':cat_features, 'month':cat_features, 'weekday':cat_features,
+    'code_azs':cat_features,'month':cat_features, 'weekday':cat_features,'region':cat_features,
+    'code1':cat_features, 'oil_price':cat_features, 'cur_points':cat_features,
     'code':[unique_cnt],
-    'percent':['min', 'max', 'median', 'sum'],
-    'type':[unique_cnt, 'min', 'max', mode_func],
-    'month':[unique_cnt, 'min', 'max', mode_func],
-    'weekday':[unique_cnt, 'min', 'max', mode_func],
-    'code_azs':[unique_cnt, 'min', 'max', mode_func],
-    'region':[unique_cnt, 'min', 'max', mode_func],
-    'code1':[unique_cnt, 'min', 'max', mode_func],
-    'oil_price':['min', 'max', 'median', 'sum'],
-    'cur_points':['min', 'max', 'median', 'sum']
-}).values
+})
+    if take_values:
+        return res.values
+    else:
+        return res
 
 
 # Example usage:
