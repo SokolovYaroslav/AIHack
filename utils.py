@@ -65,7 +65,7 @@ def get_cat_features():
     return ['n_tr', 'code_azs', 'location', 'region', 'code',
            'code1', 'type', 'month', 'weekday']
 
-def add_features(train, test, rolling_window=[], sort=False):
+def add_features(train, test, triang=False, rolling_window=[], sort=False):
     # Number of first dates of a user
     train_num_frst_purch = train[['id', 'first_prch']].groupby('id').first_prch.nunique()
     train_num_frst_purch = pd.DataFrame(train_num_frst_purch).reset_index()
@@ -125,14 +125,15 @@ def add_features(train, test, rolling_window=[], sort=False):
     x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
     spend_on_fuel = x.groupby(0)[1].sum()
     test['user_spend_fuel'] = test['id'].apply(lambda x: spend_on_fuel[x])
+    if triang:
     # triang 8 windows
-    train_roll_mean = train[['date', 'sum_b']].set_index('date')
-    train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
-    train = train.append(train_roll_mean_triang_8, ignore_index=True)
-    test_roll_mean = test[['date', 'sum_b']].set_index('date')
-    test_roll_mean_triang_8 = test_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
-    test = test.append(test_roll_mean_triang_8, ignore_index=True)
-    
+        train_roll_mean = train[['date', 'sum_b']].set_index('date')
+        train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+        train = train.append(train_roll_mean_triang_8, ignore_index=True, axis=1)
+        test_roll_mean = test[['date', 'sum_b']].set_index('date')
+        test_roll_mean_triang_8 = test_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+        test = test.append(test_roll_mean_triang_8, ignore_index=True, axis=1)
+
 #     # TOO MUCH MEMORY USED, UNCOMMENT WHEN CERTAIN 
 #     # bartlett 8 windows
 #     train_roll_mean = train[['date', 'sum_b']].set_index('date')
@@ -179,8 +180,6 @@ def add_features(train, test, rolling_window=[], sort=False):
     train['weekday'] = train.date.dt.dayofweek
     test['month'] = test.date.dt.month
     test['weekday'] = test.date.dt.dayofweek
-    train['full_month'] = (train.date.dt.year - 2016)*12 + train.date.dt.month
-    test['full_month'] = (test.date.dt.year - 2016)*12 + test.date.dt.month
     # true percent
     train['tmp'] = train['cur_points']
     train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
@@ -232,12 +231,10 @@ def calculate_target(train, offset=0, sort_y=True, by_sum_b=False):
     
     offset (int): month for target is chosen as train.month.max() - offset
     """
+    target_month = train.date.dt.month.max() - offset
+    X_train = train.loc[train.date.dt.month < target_month]
     
     dates = train.date.dt 
-    train['full_month'] = (dates.year - 2016)*12 + dates.month
-    
-    target_month = train.full_month.max() - offset
-    X_train = train.loc[train.full_month < target_month]
     
     if by_sum_b:
         users = train.loc[(dates.month == target_month) &
