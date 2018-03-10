@@ -86,23 +86,28 @@ float get_bonus(float last_month_spend, float sum_b) {
     }
 }
 
-vector<raw> transaction;
-unordered_map<string, float> points,
-                            spend[2];
+const char * file_in[] = {"./data/train_data.csv",
+                            "./data/test_data.csv"};
+const char * file_out[] = {"./data/train_points.csv",
+                                "./data/test_points.csv"};
 
 int main() {
     ios_base::sync_with_stdio(false);
     cin.tie(nullptr), cout.tie(nullptr);
-    auto fread = freopen("./data/train_data.csv", "r", stdin);
-    auto fwrite = freopen("./data/train_points.csv", "w", stdout);
     auto start = clock();
+    freopen(file_in[0], "r", stdin);
+    freopen(file_out[0], "w", stdout);
+    vector<raw> transaction;
+    unordered_map<string, float> points,
+        spend[2];
     vector<string> splitted;
     string columns;
     getline(cin, columns);
     split(&splitted, columns);
-    print_columns(splitted); 
+    print_columns(splitted);
     string s;
-    while(getline(cin, s)) {
+    while (getline(cin, s))
+    {
         splitted.clear();
         split(&splitted, s);
         transaction.push_back(raw(splitted));
@@ -110,19 +115,21 @@ int main() {
     sort(transaction.begin(), transaction.end());
     int cur_month = transaction[0].d.month,
         cur_map = 0;
-    for (auto trans: transaction) {
-        if (trans.d.month != cur_month) {
+    for (auto trans : transaction)
+    {
+        if (trans.d.month != cur_month)
+        {
             cur_month = trans.d.month;
             cur_map = 1 - cur_map;
             spend[cur_map].clear();
         }
         spend[cur_map][trans.id] += trans.sum_b;
-        points[trans.id] -= trans.percent;
-        points[trans.id] += get_bonus(spend[1 - cur_map][trans.id], trans.sum_b);
+        points[trans.id] +=
+            get_bonus(spend[1 - cur_map][trans.id], trans.sum_b) - trans.percent;
         print_transaction(trans, points[trans.id]);
     }
     cout << endl;
-    freopen ("/dev/tty", "a", stdout);
+    freopen("/dev/tty", "a", stdout);
     // cout << transaction[0].d.year << '-' << transaction[0].d.month <<
     //         '-' << transaction[0].d.day << endl;
     // cout << transaction.back().d.year << '-' << transaction.back().d.month <<

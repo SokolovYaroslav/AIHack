@@ -50,6 +50,15 @@ def load_data(resave=False, points=True):
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
 
 def add_features(train, test):
+    # Number of first dates of a user
+    train_num_frst_purch = train[['id', 'first_prch']].groupby('id').first_prch.nunique()
+    train_num_frst_purch = pd.DataFrame(train_num_frst_purch).reset_index()
+    train = train.merge(train_num_frst_purch, left_on='id', right_on='id', how='outer')
+    train = train.rename(index=str, columns={"first_prch_x": "first_prch", "first_prch_y": "first_prch_num"})
+    test_num_frst_purch = test[['id', 'first_prch']].groupby('id').first_prch.nunique()
+    test_num_frst_purch = pd.DataFrame(test_num_frst_purch).reset_index()
+    test = test.merge(test_num_frst_purch, left_on='id', right_on='id', how='outer')
+    test = test.rename(index=str, columns={"first_prch_x": "first_prch", "first_prch_y": "first_prch_num"})
     # Count returns of product
     train_neg = train[train['sum_b'] < 0]
     train_neg_count = train_neg[['id']].groupby('id').size().reset_index(name='return_num')
@@ -96,6 +105,7 @@ def add_features(train, test):
     test['oil_price'].fillna(0, inplace=True)
     test['oil_price'] = test['oil_price'].replace(np.inf, 0)
     return train, test
+
 
 def calculate_target(train, offset=0):
     """
