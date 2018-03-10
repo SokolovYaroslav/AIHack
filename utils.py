@@ -52,7 +52,18 @@ def load_data(resave=False, points=True, sort=False):
         test.to_hdf('data/data.hdf', 'test')
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
 
-def add_features(train, test):
+def save_to(train, test, path):
+    train.to_hdf(path, 'train')
+    test.to_hdf(path, 'test')
+    
+def load_from(path):
+    return pd.read_hdf(path, 'train'), pd.read_hdf(path, 'test')
+
+def get_cat_features():
+    return ['n_tr', 'code_azs', 'location', 'region', 'code',
+           'code1', 'type', 'month', 'weekday']
+
+def add_features(train, test, rolling_window=[], sort=False):
     # Number of first dates of a user
     train_num_frst_purch = train[['id', 'first_prch']].groupby('id').first_prch.nunique()
     train_num_frst_purch = pd.DataFrame(train_num_frst_purch).reset_index()
@@ -95,18 +106,67 @@ def add_features(train, test):
     train.v_l = train.v_l.apply(log)
     test.v_l = test.v_l.apply(log)
     # mean oil price for every oil type code
-    train_no_q = train[train['q'] == 0]
+    train_no_q = train[(train['q'] == 0) & (train['v_l'] > 0) & (train['sum_b'] > 0)]
     train_no_q['oil_price'] = train_no_q['sum_b'] / train_no_q['v_l']
     train_no_q_group = train_no_q[['code','oil_price']].groupby('code').agg('mean').reset_index()
     train = train.merge(train_no_q_group, left_on='code', right_on='code', how='outer')
     train['oil_price'].fillna(0, inplace=True)
-    train['oil_price'] = train['oil_price'].replace(np.inf, 0)
-    test_no_q = test[test['q'] == 0]
+    train['oil_price'] = test['oil_price'].replace(np.inf, 0)
+    test_no_q = test[(test['q'] == 0) & (test['v_l'] > 0) & (test['sum_b'] > 0)]
     test_no_q['oil_price'] = test_no_q['sum_b'] / test_no_q['v_l']
     test_no_q_group = test_no_q[['code','oil_price']].groupby('code').agg('mean').reset_index()
     test = test.merge(test_no_q_group, left_on='code', right_on='code', how='outer')
     test['oil_price'].fillna(0, inplace=True)
     test['oil_price'] = test['oil_price'].replace(np.inf, 0)
+    # triang 8 windows
+    train_roll_mean = train[['date', 'sum_b']].set_index('date')
+    train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+    train = train.append(train_roll_mean_triang_8, ignore_index=True)
+    test_roll_mean = test[['date', 'sum_b']].set_index('date')
+    test_roll_mean_triang_8 = test_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+    test = test.append(test_roll_mean_triang_8, ignore_index=True)
+    
+#     # TOO MUCH MEMORY USED, UNCOMMENT WHEN CERTAIN 
+#     # bartlett 8 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_bartlett_8 = train_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_8"})
+#     train = train.append(train_roll_mean_bartlett_8, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_bartlett_8 = test_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_8"})
+
+#     test = test.append(test_roll_mean_bartlett_8, ignore_index=True)
+#     # bartlett 16 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_bartlett_16 = train_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_16"})
+#     train = train.append(train_roll_mean_bartlett_16, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_bartlett_16 = test_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_16"})
+#     test = test.append(test_roll_mean_bartlett_16, ignore_index=True
+
+#     # blackmanharris 16 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_blackmanharris_16 = train_roll_mean.rolling(16, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_16"})
+#     train = train.append(train_roll_mean_blackmanharris_16, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_blackmanharris_16 = test_roll_mean.rolling(16, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_16"})
+#     test = test.append(test_roll_mean_blackmanharris_16, ignore_index=True)
+
+#     # triang 16 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_triang_16 = train_roll_mean.rolling(16, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_16"})
+#     train = train.append(train_roll_mean_triang_16, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_triang_16 = test_roll_mean.rolling(16, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_16"})
+#     test = test.append(test_roll_mean_triang_16, ignore_index=True)
+
+#     # blackmanharris 8 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_blackmanharris_8 = train_roll_mean.rolling(8, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_8"})
+#     train = train.append(train_roll_mean_blackmanharris_8, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_blackmanharris_8 = test_roll_mean.rolling(8, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_8"})
+#     test = test.append(test_roll_mean_blackmanharris_8, ignore_index=True)
+
     # reaches by 4 category: 25%, 50%, 75%
     spend_by_users = train.groupby('id')['sum_b'].sum()
     q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
@@ -129,7 +189,36 @@ def add_features(train, test):
     
     x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
     spend_on_fuel = x.groupby(0)[1].sum()
-    test['user_spend_fuel'] = test['id'].apply(lambda x: spend_on_fuel[x])
+    # true percent
+    train['tmp'] = train['cur_points']
+    train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
+    train = train.merge(train.groupby('id').tmp.min().reset_index(name='min_point_bal'),
+                left_on='id', right_on='id', how='outer')
+    train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'min_point_bal']
+    train['tmp'] = train.loc[:, 'cur_points'] - train.loc[:, 'percent']
+    train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
+    train = train.merge(train.groupby('id').tmp.min().reset_index(name='tmp_1'),
+                        left_on='id', right_on='id', how='outer')
+    train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'tmp_1']
+    train['true_percent'] = ((train.loc[:,'percent'] / train.loc[:,'cur_points']) * 100).fillna(0)
+    train.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    
+    test['tmp'] = test['cur_points']
+    test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
+    test = test.merge(test.groupby('id').tmp.min().reset_index(name='min_point_bal'),
+                left_on='id', right_on='id', how='outer')
+    test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'min_point_bal']
+    test['tmp'] = test.loc[:, 'cur_points'] - test.loc[:, 'percent']
+    test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
+    test = test.merge(test.groupby('id').tmp.min().reset_index(name='tmp_1'),
+                        left_on='id', right_on='id', how='outer')
+    test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
+    test['true_percent'] = ((test.loc[:,'percent'] / test.loc[:,'cur_points']) * 100).fillna(0)
+    test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    
+    if sort:
+        train = train.sort_values(by=['id', 'date'])
+        test = test.sort_values(by=['id', 'date'])
     return train, test
 
 
@@ -160,7 +249,8 @@ def train_test_split(X_train, y_train, train_size=0.75):
     assert(X_train.id.nunique() == y_train.shape[0])
     split_id = X_train.id.unique()[train_size]
     split_index = np.where(X_train.id == split_id)[0].min()
-    return X_train.iloc[:split_index, :], X_train.iloc[split_index:, :],           y_train.iloc[:train_size], y_train.iloc[train_size:]
+    return X_train.iloc[:split_index, :], X_train.iloc[split_index:, :],\
+            y_train.iloc[:train_size], y_train.iloc[train_size:]
 
 def get_rich_category(user_spend, q25, q50, q75):
     if user_spend < q25:
@@ -196,20 +286,20 @@ def cross_val(clf, X_train, aggregate_func, return_proba=False,
         
         if verbose:
             print("Aggregating X_tr..")
-        X_tr = aggregate_func(X_tr)
+        X_tr = aggregate_func(X_tr, take_values=False)
         if verbose:
             print("Aggregating X_val..")
-        X_val = aggregate_func(X_val)
+        X_val = aggregate_func(X_val, take_values=False)
         
         if verbose:
             print("Fitting classifier..")
-        clf.fit(X_tr, y_tr)
+        clf.fit(X_tr.values, y_tr)
         pred = clf.predict_proba(X_val)[:, 1]
         scores.append(roc_auc_score(y_val, pred))
         if verbose:
             print("Target month: -{}. Score: {}".format(offset, scores[-1]))
             print("-------------------")
-        probas.append(pd.Series(pred, index=X_tr.id.unique()))
+        probas.append(pd.Series(pred, index=X_val.index))
     if verbose:
         print("Mean score is:", np.mean(scores))
     if return_proba:
@@ -221,25 +311,23 @@ def unique_cnt(series):
 
 mode_func = lambda x: stats.mode(x).mode[0]
 
-def get_aggregate(df):
-    return df.groupby('id')[['v_l', 'q', 'sum_b', 'location', 'code', 'percent', 'type', 'month',\
+def aggregate(df, take_values=True):
+    mode = lambda x: stats.mode(x).mode[0]
+    num_features = ['min', 'max', 'median', 'sum']
+    cat_features = [unique_cnt, 'min', 'max', mode]
+    
+    res = df.groupby('id')[['v_l', 'q', 'sum_b', 'location', 'code', 'percent', 'type', 'month',\
                             'weekday', 'code_azs','region', 'code1', 'oil_price', 'cur_points']].agg({
-    'v_l':['min', 'max', 'median', 'sum'],
-    'q':['min', 'max', 'median', 'sum'],
-    'sum_b':['min', 'max', 'median', 'sum'],
-    'location':[unique_cnt, 'min', 'max', mode_func],
+    'v_l':num_features, 'q':num_features, 'sum_b':num_features, 'percent':num_features, 
+    'location':cat_features,'type':cat_features, 'month':cat_features, 'weekday':cat_features,
+    'code_azs':cat_features,'month':cat_features, 'weekday':cat_features,'region':cat_features,
+    'code1':cat_features, 'oil_price':cat_features, 'cur_points':cat_features,
     'code':[unique_cnt],
-    'percent':['min', 'max', 'median', 'sum'],
-    'type':[unique_cnt, 'min', 'max', mode_func],
-    'month':[unique_cnt, 'min', 'max', mode_func],
-    'weekday':[unique_cnt, 'min', 'max', mode_func],
-    'code_azs':[unique_cnt, 'min', 'max', mode_func],
-    'region':[unique_cnt, 'min', 'max', mode_func],
-    'code1':[unique_cnt, 'min', 'max', mode_func],
-    'oil_price':['min', 'max', 'median', 'sum'],
-    'cur_points':['min', 'max', 'median', 'sum']
-}).values
-
+})
+    if take_values:
+        return res.values, res.index
+    else:
+        return res
 
 # Example usage:
 
