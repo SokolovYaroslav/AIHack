@@ -83,7 +83,7 @@ def add_features(train, test, rolling_window=[], sort=False):
     q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
     test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
     test['rich_category'] = test['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
-    # Count returns of product
+    # count returns of product
     train_neg = train[train['sum_b'] < 0]
     train_neg_count = train_neg[['id']].groupby('id').size().reset_index(name='return_num')
     train = train.merge(train_neg_count, left_on='id', right_on='id', how='outer')
@@ -92,6 +92,13 @@ def add_features(train, test, rolling_window=[], sort=False):
     test_neg_count = test_neg[['id']].groupby('id').size().reset_index(name='return_num')
     test = test.merge(test_neg_count, left_on='id', right_on='id', how='outer')
     test['return_num'].fillna(0, inplace=True)
+     # spend_on_fuel
+    x = pd.DataFrame(np.array([train['id'], train['v_l'] * train['oil_price']]).T)
+    spend_on_fuel = x.groupby(0)[1].sum()
+    train['user_spend_fuel'] = train['id'].apply(lambda x: spend_on_fuel[x])
+    
+    x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
+    spend_on_fuel = x.groupby(0)[1].sum()
     # replace all first_prch with earliest first_prch
     train_first = train.groupby('id').first_prch.min().reset_index(name='first_prch')
     train = train.drop('first_prch', axis=1).merge(train_first, left_on='id', right_on='id', how='outer')
@@ -102,15 +109,6 @@ def add_features(train, test, rolling_window=[], sort=False):
     train = train.drop('first_prch', axis=1).merge(train_first, left_on='id', right_on='id', how='outer')
     test_first = test.groupby('id').first_prch.min().reset_index(name='first_prch')
     test = test.drop('first_prch', axis=1).merge(test_first, left_on='id', right_on='id', how='outer')
-    # logarithmic values
-    train.sum_b = train.sum_b.apply(log)
-    test.sum_b = test.sum_b.apply(log)
-    train.q = train.q.apply(log)
-    test.q = test.q.apply(log)
-    train.v_l = train.v_l.apply(log)
-    test.v_l = test.v_l.apply(log)
-    train.total_user_spend = train.total_user_spend.apply(log)
-    test.total_user_spend = test.total_user_spend.apply(log)
     # mean oil price for every oil type code
     train_no_q = train[(train['q'] == 0) & (train['sum_b'] > 0)]
     train_no_q['oil_price'] = train_no_q['sum_b'] / train_no_q['v_l']
@@ -178,13 +176,6 @@ def add_features(train, test, rolling_window=[], sort=False):
     train['weekday'] = train.date.dt.dayofweek
     test['month'] = test.date.dt.month
     test['weekday'] = test.date.dt.dayofweek
-    # spend_on_fuel
-    x = pd.DataFrame(np.array([train['id'], train['v_l'] * train['oil_price']]).T)
-    spend_on_fuel = x.groupby(0)[1].sum()
-    train['user_spend_fuel'] = train['id'].apply(lambda x: spend_on_fuel[x])
-    
-    x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
-    spend_on_fuel = x.groupby(0)[1].sum()
     # true percent
     train['tmp'] = train['cur_points']
     train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
@@ -211,6 +202,17 @@ def add_features(train, test, rolling_window=[], sort=False):
     test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
     test['true_percent'] = ((test.loc[:,'percent'] / test.loc[:,'cur_points']) * 100).fillna(0)
     test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    # logarithmic values
+    train.sum_b = train.sum_b.apply(log)
+    test.sum_b = test.sum_b.apply(log)
+    train.q = train.q.apply(log)
+    test.q = test.q.apply(log)
+    train.v_l = train.v_l.apply(log)
+    test.v_l = test.v_l.apply(log)
+    train.total_user_spend = train.total_user_spend.apply(log)
+    test.total_user_spend = test.total_user_spend.apply(log)
+    train.user_spend_fuel = train.user_spend_fuel.apply(log)
+    test.user_spend_fuel = test.user_spend_fuel.apply(log)
     
     if sort:
         train = train.sort_values(by=['id', 'date'])
