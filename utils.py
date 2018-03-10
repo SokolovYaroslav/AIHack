@@ -179,6 +179,8 @@ def add_features(train, test, rolling_window=[], sort=False):
     train['weekday'] = train.date.dt.dayofweek
     test['month'] = test.date.dt.month
     test['weekday'] = test.date.dt.dayofweek
+    train['full_month'] = (train.date.dt.year - 2016)*12 + train.date.dt.month
+    test['full_month'] = (test.date.dt.year - 2016)*12 + test.date.dt.month
     # true percent
     train['tmp'] = train['cur_points']
     train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
@@ -230,10 +232,12 @@ def calculate_target(train, offset=0, sort_y=True, by_sum_b=False):
     
     offset (int): month for target is chosen as train.month.max() - offset
     """
-    target_month = train.date.dt.month.max() - offset
-    X_train = train.loc[train.date.dt.month < target_month]
     
     dates = train.date.dt 
+    train['full_month'] = (dates.year - 2016)*12 + dates.month
+    
+    target_month = train.full_month.max() - offset
+    X_train = train.loc[train.full_month < target_month]
     
     if by_sum_b:
         users = train.loc[(dates.month == target_month) &
