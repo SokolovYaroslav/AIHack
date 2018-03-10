@@ -223,7 +223,7 @@ def add_features(train, test, rolling_window=[], sort=False):
     return train, test
 
 
-def calculate_target(train, offset=0, sort_y=True):
+def calculate_target(train, offset=0, sort_y=True, by_sum_b=False):
     """
     Returns X_train without last 30 days and Series with index=ids, values=target
     Target is built only for users who were present in the X_train (w\o last 30 days)
@@ -233,7 +233,15 @@ def calculate_target(train, offset=0, sort_y=True):
     target_month = train.date.dt.month.max() - offset
     X_train = train.loc[train.date.dt.month < target_month]
     
-    users = train.loc[train.date.dt.month == target_month].id.unique()
+    dates = train.date.dt 
+    
+    if by_sum_b:
+        users = train.loc[(dates.month == target_month) &
+                          (dates.year == dates.year.max() - target_month // 12)].groupby('id')['sum_b']\
+               .apply(lambda gr: gr.fillna(gr.mean()).sum())
+    else:
+        users = train.loc[(dates.month == target_month) & 
+                          (dates.year == dates.year.max() - target_month // 12)].id.unique()
     #or aggregate by sum_b, see if the same
     users = np.intersect1d(users, X_train.id.unique())
     
