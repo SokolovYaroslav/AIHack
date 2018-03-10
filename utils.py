@@ -36,8 +36,11 @@ def load_data(resave=False, points=True):
         test_path = 'data/test_data.csv'
 
     if not os.path.isfile('data/data.hdf') or resave:
-        train = pd.read_csv(train_path, low_memory=False).drop('Unnamed: 0', axis=1)
-        test = pd.read_csv(test_path, low_memory=False).drop('Unnamed: 0', axis=1)
+        train = pd.read_csv(train_path, low_memory=False)
+        test = pd.read_csv(test_path, low_memory=False)
+        if 'Unnamed: 0' in train.columns:
+            train = train.drop('Unnamed: 0', axis=1)
+            test = test.drop('Unnamed: 0', axis=1)
         train['date'] = pd.to_datetime(train.date)
         test['date'] = pd.to_datetime(test.date)
         train['first_prch'] = train.first_prch.apply(lambda x: datetime.strptime(x, '%d.%m.%y %H:%M:%S'))
