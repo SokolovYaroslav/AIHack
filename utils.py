@@ -73,6 +73,16 @@ def add_features(train, test, rolling_window=[], sort=False):
     test_num_frst_purch = pd.DataFrame(test_num_frst_purch).reset_index()
     test = test.merge(test_num_frst_purch, left_on='id', right_on='id', how='outer')
     test = test.rename(index=str, columns={"first_prch_x": "first_prch", "first_prch_y": "first_prch_num"})
+    # reaches by 4 category: 25%, 50%, 75%
+    spend_by_users = train.groupby('id')['sum_b'].sum()
+    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
+    train['total_user_spend'] = train['id'].apply(lambda x: spend_by_users[x])
+    train['rich_category'] = train['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
+    
+    spend_by_users = test.groupby('id')['sum_b'].sum()
+    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
+    test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
+    test['rich_category'] = test['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
     # Count returns of product
     train_neg = train[train['sum_b'] < 0]
     train_neg_count = train_neg[['id']].groupby('id').size().reset_index(name='return_num')
@@ -87,12 +97,6 @@ def add_features(train, test, rolling_window=[], sort=False):
     train = train.drop('first_prch', axis=1).merge(train_first, left_on='id', right_on='id', how='outer')
     test_first = test.groupby('id').first_prch.min().reset_index(name='first_prch')
     test = test.drop('first_prch', axis=1).merge(test_first, left_on='id', right_on='id', how='outer')
-    # logarithmic values
-    train.sum_b = train.sum_b.apply(log)
-    test.sum_b = test.sum_b.apply(log)
-    train.q = train.q.apply(log)
-    test.q = test.q.apply(log)
-    train.v_l = train.v_l.apply(log)
     # replace all first_prch with earliest first_prch
     train_first = train.groupby('id').first_prch.min().reset_index(name='first_prch')
     train = train.drop('first_prch', axis=1).merge(train_first, left_on='id', right_on='id', how='outer')
@@ -105,6 +109,8 @@ def add_features(train, test, rolling_window=[], sort=False):
     test.q = test.q.apply(log)
     train.v_l = train.v_l.apply(log)
     test.v_l = test.v_l.apply(log)
+    train.total_user_spend = train.total_user_spend.apply(log)
+    test.total_user_spend = test.total_user_spend.apply(log)
     # mean oil price for every oil type code
     train_no_q = train[(train['q'] == 0) & (train['sum_b'] > 0)]
     train_no_q['oil_price'] = train_no_q['sum_b'] / train_no_q['v_l']
@@ -167,16 +173,6 @@ def add_features(train, test, rolling_window=[], sort=False):
 #     test_roll_mean_blackmanharris_8 = test_roll_mean.rolling(8, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_8"})
 #     test = test.append(test_roll_mean_blackmanharris_8, ignore_index=True)
 
-    # reaches by 4 category: 25%, 50%, 75%
-    spend_by_users = train.groupby('id')['sum_b'].sum()
-    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
-    train['total_user_spend'] = train['id'].apply(lambda x: spend_by_users[x])
-    train['rich_category'] = train['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
-    
-    spend_by_users = test.groupby('id')['sum_b'].sum()
-    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
-    test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
-    test['rich_category'] = test['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
     # time features
     train['month'] = train.date.dt.month
     train['weekday'] = train.date.dt.dayofweek
