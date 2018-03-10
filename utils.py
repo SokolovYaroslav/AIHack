@@ -1,3 +1,4 @@
+
 # coding: utf-8
 
 # In[1]:
@@ -64,7 +65,7 @@ def get_cat_features():
     return ['n_tr', 'code_azs', 'location', 'region', 'code',
            'code1', 'type', 'month', 'weekday']
 
-def add_features(train, test, rolling_window=[], sort=False):
+def add_features(train, test, triang=False, rolling_window=[], sort=False):
     # Number of first dates of a user
     train_num_frst_purch = train[['id', 'first_prch']].groupby('id').first_prch.nunique()
     train_num_frst_purch = pd.DataFrame(train_num_frst_purch).reset_index()
@@ -124,14 +125,15 @@ def add_features(train, test, rolling_window=[], sort=False):
     x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
     spend_on_fuel = x.groupby(0)[1].sum()
     test['user_spend_fuel'] = test['id'].apply(lambda x: spend_on_fuel[x])
+    if triang:
     # triang 8 windows
-    train_roll_mean = train[['date', 'sum_b']].set_index('date')
-    train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
-    train = train.append(train_roll_mean_triang_8, ignore_index=True)
-    test_roll_mean = test[['date', 'sum_b']].set_index('date')
-    test_roll_mean_triang_8 = test_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
-    test = test.append(test_roll_mean_triang_8, ignore_index=True)
-    
+        train_roll_mean = train[['date', 'sum_b']].set_index('date')
+        train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+        train = train.append(train_roll_mean_triang_8, ignore_index=True, axis=1)
+        test_roll_mean = test[['date', 'sum_b']].set_index('date')
+        test_roll_mean_triang_8 = test_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+        test = test.append(test_roll_mean_triang_8, ignore_index=True, axis=1)
+
 #     # TOO MUCH MEMORY USED, UNCOMMENT WHEN CERTAIN 
 #     # bartlett 8 windows
 #     train_roll_mean = train[['date', 'sum_b']].set_index('date')
@@ -180,6 +182,7 @@ def add_features(train, test, rolling_window=[], sort=False):
     test['weekday'] = test.date.dt.dayofweek
     train['full_month'] = (train.date.dt.year - 2016)*12 + train.date.dt.month
     test['full_month'] = (test.date.dt.year - 2016)*12 + test.date.dt.month
+    #train['hour'] = 
     # true percent
     train['tmp'] = train['cur_points']
     train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
@@ -206,52 +209,6 @@ def add_features(train, test, rolling_window=[], sort=False):
     test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
     test['true_percent'] = ((test.loc[:,'percent'] / test.loc[:,'cur_points']) * 100).fillna(0)
     test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
-    # number of purchases of a user
-    purch_num_tr = train[['id', 'sum_b']].groupby('id').agg('count')
-    purch_num_tr = purch_num_tr.rename(index=str, columns={"sum_b": "num_purch"}).reset_index()
-    train = train.merge(purch_num_tr, left_on='id', right_on='id', how='outer')
-    purch_num_test = test[['id', 'sum_b']].groupby('id').agg('count')
-    purch_num_test = purch_num_test.rename(index=str, columns={"sum_b": "num_purch"}).reset_index()
-    train = test.merge(purch_num_test, left_on='id', right_on='id', how='outer')
-    # location type mostly preferred by a customer
-    location_usr_tr = train[['id', 'location']].groupby('id').agg(pd.Series.mode)
-    loc_user_pref_tr = location_usr_tr.rename(index=str, columns={"location": "loc_user_pref"}).reset_index()
-    train = train.merge(loc_user_pref_tr, left_on='id', right_on='id', how='outer')
-    location_usr_test = test[['id', 'location']].groupby('id').agg(pd.Series.mode)
-    loc_user_pref_test = location_usr_test.rename(index=str, columns={"location": "loc_user_pref"}).reset_index()
-    test = test.merge(loc_user_pref_test, left_on='id', right_on='id', how='outer')
-    # payment type mostly preferred by a customer
-    type_usr_tr = train[['id', 'type']].groupby('id').agg(pd.Series.mode)
-    type_user_pref_tr = type_usr_tr.rename(index=str, columns={"type": "type_user_pref"}).reset_index()
-    train = train.merge(type_user_pref_tr, left_on='id', right_on='id', how='outer')
-    type_usr_test = test[['id', 'type']].groupby('id').agg(pd.Series.mode)
-    type_user_pref_test = type_usr_test.rename(index=str, columns={"type": "type_user_pref"}).reset_index()
-    test = test.merge(type_user_pref_test, left_on='id', right_on='id', how='outer')
-    # add monthly and average fuel value, sum_b and azs change
-    train['month'] = train.date.apply(lambda date: (date.year - 2016) * 12 + date.month)
-    train = train.merge(train.groupby(['id', 'month']).v_l.sum().reset_index(name='monthly_V'), 
-                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
-    train = train.merge(train.groupby('id').monthly_V.mean().reset_index(name='mean_V'),
-                left_on='id', right_on='id', how='outer')
-    train = train.merge(train.groupby(['id', 'month']).sum_b.sum().reset_index(name='monthly_sum_b'), 
-                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
-    train = train.merge(train.groupby('id').monthly_sum_b.mean().reset_index(name='mean_sum_b'),
-                left_on='id', right_on='id', how='outer')
-    train = train.merge(train.groupby(['id', 'month']).code_azs.nunique().reset_index(name='azs_monthly_change'),
-                        left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
-    test['month'] = test.date.apply(lambda date: (date.year - 2016) * 12 + date.month)
-    test = test.merge(test.groupby(['id', 'month']).v_l.sum().reset_index(name='monthly_V'), 
-                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
-    test = test.merge(test.groupby('id').monthly_V.mean().reset_index(name='mean_V'),
-                left_on='id', right_on='id', how='outer')
-    test = test.merge(test.groupby(['id', 'month']).sum_b.sum().reset_index(name='monthly_sum_b'), 
-                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
-    test = test.merge(test.groupby('id').monthly_sum_b.mean().reset_index(name='mean_sum_b'),
-                left_on='id', right_on='id', how='outer')
-    test = test.merge(test.groupby(['id', 'month']).code_azs.nunique().reset_index(name='azs_monthly_change'),
-                        left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
-    
-    
     # logarithmic values
     train.sum_b = train.sum_b.apply(log)
     test.sum_b = test.sum_b.apply(log)
@@ -277,21 +234,24 @@ def calculate_target(train, offset=0, sort_y=True, by_sum_b=False):
     
     offset (int): month for target is chosen as train.month.max() - offset
     """
+    target_month = train.date.dt.month.max() - offset
+    X_train = train.loc[train.date.dt.month < target_month]
     
     dates = train.date.dt 
     train['full_month'] = (dates.year - 2016)*12 + dates.month
     
     target_month = train.full_month.max() - offset
     X_train = train.loc[train.full_month < target_month]
+    users_last_month = X_train.loc[X_train.full_month == target_month - 1].id.unique()
+    X_train = X_train.set_index('id').loc[users_last_month].reset_index()
+    #X_train = X_train.loc[X_train.loc[:, 'id'].apply(lambda x: x in users_last_month), :]
     
     if by_sum_b:
-        users = train.loc[(dates.month == target_month) &
-                          (dates.year == dates.year.max() - target_month // 12)].groupby('id')['sum_b']\
+        users = train.loc[train.full_month == target_month].groupby('id')['sum_b']\
                .apply(lambda gr: gr.fillna(gr.mean()).sum())
     else:
-        users = train.loc[(dates.month == target_month) & 
-                          (dates.year == dates.year.max() - target_month // 12)].id.unique()
-    #or aggregate by sum_b, see if the same
+        users = train.loc[train.full_month == target_month].id.unique()
+    
     users = np.intersect1d(users, X_train.id.unique())
     
     target = pd.Series(np.ones((X_train.id.nunique())), index=X_train.id.unique())
@@ -392,3 +352,4 @@ def aggregate(df, take_values=True):
 #X_train, y_train = calculate_target(train, offset=0)
 
 #X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train)
+
