@@ -13,7 +13,7 @@ import math
 
 def log(x):
     if x <= 0:
-        return -math.log(-x - 1)
+        return -log(-x)
     else: 
         return math.log(x + 1)
 
