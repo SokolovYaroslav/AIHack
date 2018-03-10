@@ -75,14 +75,12 @@ void print_transaction(raw & trans, float cur_points) {
 }
 
 float get_bonus(float last_month_spend, float sum_b) {
-    if (last_month_spend >= 10000) {
+    if (last_month_spend >= 12000) {
         return 0.05 * sum_b;
-    } else if (last_month_spend >= 8000) {
-        return 0.04 * sum_b;
     } else if (last_month_spend >= 6000) {
-        return 0.03 * sum_b;
+        return 0.04 * sum_b;
     } else {
-        return 0;
+        return 0.03 * sum_b;
     }
 }
 
