@@ -52,7 +52,7 @@ def load_data(resave=False, points=True, sort=False):
         test.to_hdf('data/data.hdf', 'test')
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
 
-def add_features(train, test):
+def add_features(train, test, rolling_window=[]):
     # Number of first dates of a user
     train_num_frst_purch = train[['id', 'first_prch']].groupby('id').first_prch.nunique()
     train_num_frst_purch = pd.DataFrame(train_num_frst_purch).reset_index()
@@ -107,6 +107,65 @@ def add_features(train, test):
     test = test.merge(test_no_q_group, left_on='code', right_on='code', how='outer')
     test['oil_price'].fillna(0, inplace=True)
     test['oil_price'] = test['oil_price'].replace(np.inf, 0)
+    # triang 8 windows
+    train_roll_mean = train[['date', 'sum_b']].set_index('date')
+    train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+    train = train.append(train_roll_mean_triang_8, ignore_index=True)
+    test_roll_mean = test[['date', 'sum_b']].set_index('date')
+    test_roll_mean_triang_8 = test_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
+    test = test.append(test_roll_mean_triang_8, ignore_index=True)
+    
+#     # TOO MUCH MEMORY USED, UNCOMMENT WHEN CERTAIN 
+#     # bartlett 8 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_bartlett_8 = train_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_8"})
+#     train = train.append(train_roll_mean_bartlett_8, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_bartlett_8 = test_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_8"})
+
+#     test = test.append(test_roll_mean_bartlett_8, ignore_index=True)
+#     # bartlett 16 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_bartlett_16 = train_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_16"})
+#     train = train.append(train_roll_mean_bartlett_16, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_bartlett_16 = test_roll_mean.rolling(16, win_type='bartlett').mean().rename(index=str, columns={"sum_b": "roll_win_bartlett_16"})
+#     test = test.append(test_roll_mean_bartlett_16, ignore_index=True
+
+#     # blackmanharris 16 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_blackmanharris_16 = train_roll_mean.rolling(16, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_16"})
+#     train = train.append(train_roll_mean_blackmanharris_16, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_blackmanharris_16 = test_roll_mean.rolling(16, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_16"})
+#     test = test.append(test_roll_mean_blackmanharris_16, ignore_index=True)
+
+#     # triang 16 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_triang_16 = train_roll_mean.rolling(16, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_16"})
+#     train = train.append(train_roll_mean_triang_16, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_triang_16 = test_roll_mean.rolling(16, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_16"})
+#     test = test.append(test_roll_mean_triang_16, ignore_index=True)
+
+#     # blackmanharris 8 windows
+#     train_roll_mean = train[['date', 'sum_b']].set_index('date')
+#     train_roll_mean_blackmanharris_8 = train_roll_mean.rolling(8, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_8"})
+#     train = train.append(train_roll_mean_blackmanharris_8, ignore_index=True)
+#     test_roll_mean = test[['date', 'sum_b']].set_index('date')
+#     test_roll_mean_blackmanharris_8 = test_roll_mean.rolling(8, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_8"})
+#     test = test.append(test_roll_mean_blackmanharris_8, ignore_index=True)
+
+    # reaches by 4 category: 25%, 50%, 75%
+    spend_by_users = train.groupby('id')['sum_b'].sum()
+    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
+    train['total_user_spend'] = train['id'].apply(lambda x: spend_by_users[x])
+    train['rich_category'] = train['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
+    
+    spend_by_users = test.groupby('id')['sum_b'].sum()
+    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
+    test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
+    test['rich_category'] = test['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
     # time features
     train['month'] = train.date.dt.month
     train['weekday'] = train.date.dt.dayofweek
@@ -144,6 +203,15 @@ def train_test_split(X_train, y_train, train_size=0.75):
     split_index = np.where(X_train.id == split_id)[0].min()
     return X_train.iloc[:split_index, :], X_train.iloc[split_index:, :],           y_train.iloc[:train_size], y_train.iloc[train_size:]
 
+def get_rich_category(user_spend, q25, q50, q75):
+    if user_spend < q25:
+        return 0
+    elif user_spend < q50:
+        return 1
+    elif user_spend < q75:
+        return 2
+    else:
+        return 3
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
               splits=3, interval=0, train_size=0.75, verbose=True):
