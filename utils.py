@@ -182,6 +182,33 @@ def add_features(train, test, rolling_window=[], sort=False):
     train['weekday'] = train.date.dt.dayofweek
     test['month'] = test.date.dt.month
     test['weekday'] = test.date.dt.dayofweek
+    # true percent
+    train['tmp'] = train['cur_points']
+    train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
+    train = train.merge(train.groupby('id').tmp.min().reset_index(name='min_point_bal'),
+                left_on='id', right_on='id', how='outer')
+    train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'min_point_bal']
+    train['tmp'] = train.loc[:, 'cur_points'] - train.loc[:, 'percent']
+    train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
+    train = train.merge(train.groupby('id').tmp.min().reset_index(name='tmp_1'),
+                        left_on='id', right_on='id', how='outer')
+    train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'tmp_1']
+    train['true_percent'] = ((train.loc[:,'percent'] / train.loc[:,'cur_points']) * 100).fillna(0)
+    train.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    
+    test['tmp'] = test['cur_points']
+    test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
+    test = test.merge(test.groupby('id').tmp.min().reset_index(name='min_point_bal'),
+                left_on='id', right_on='id', how='outer')
+    test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'min_point_bal']
+    test['tmp'] = test.loc[:, 'cur_points'] - test.loc[:, 'percent']
+    test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
+    test = test.merge(test.groupby('id').tmp.min().reset_index(name='tmp_1'),
+                        left_on='id', right_on='id', how='outer')
+    test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
+    test['true_percent'] = ((test.loc[:,'percent'] / test.loc[:,'cur_points']) * 100).fillna(0)
+    test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    
     if sort:
         train = train.sort_values(by=['id', 'date'])
         test = test.sort_values(by=['id', 'date'])
