@@ -227,6 +227,31 @@ def add_features(train, test, rolling_window=[], sort=False):
     type_usr_test = test[['id', 'type']].groupby('id').agg(pd.Series.mode)
     type_user_pref_test = type_usr_test.rename(index=str, columns={"type": "type_user_pref"}).reset_index()
     test = test.merge(type_user_pref_test, left_on='id', right_on='id', how='outer')
+    # add monthly and average fuel value, sum_b and azs change
+    train['month'] = train.date.apply(lambda date: (date.year - 2016) * 12 + date.month)
+    train = train.merge(train.groupby(['id', 'month']).v_l.sum().reset_index(name='monthly_V'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    train = train.merge(train.groupby('id').monthly_V.mean().reset_index(name='mean_V'),
+                left_on='id', right_on='id', how='outer')
+    train = train.merge(train.groupby(['id', 'month']).sum_b.sum().reset_index(name='monthly_sum_b'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    train = train.merge(train.groupby('id').monthly_sum_b.mean().reset_index(name='mean_sum_b'),
+                left_on='id', right_on='id', how='outer')
+    train = train.merge(train.groupby(['id', 'month']).code_azs.nunique().reset_index(name='azs_monthly_change'),
+                        left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    test['month'] = test.date.apply(lambda date: (date.year - 2016) * 12 + date.month)
+    test = test.merge(test.groupby(['id', 'month']).v_l.sum().reset_index(name='monthly_V'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    test = test.merge(test.groupby('id').monthly_V.mean().reset_index(name='mean_V'),
+                left_on='id', right_on='id', how='outer')
+    test = test.merge(test.groupby(['id', 'month']).sum_b.sum().reset_index(name='monthly_sum_b'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    test = test.merge(test.groupby('id').monthly_sum_b.mean().reset_index(name='mean_sum_b'),
+                left_on='id', right_on='id', how='outer')
+    test = test.merge(test.groupby(['id', 'month']).code_azs.nunique().reset_index(name='azs_monthly_change'),
+                        left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    
+    
     # logarithmic values
     train.sum_b = train.sum_b.apply(log)
     test.sum_b = test.sum_b.apply(log)
