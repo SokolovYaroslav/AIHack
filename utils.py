@@ -122,6 +122,7 @@ def add_features(train, test, rolling_window=[], sort=False):
     
     x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
     spend_on_fuel = x.groupby(0)[1].sum()
+    test['user_spend_fuel'] = test['id'].apply(lambda x: spend_on_fuel[x])
     # triang 8 windows
     train_roll_mean = train[['date', 'sum_b']].set_index('date')
     train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
