@@ -58,7 +58,12 @@ def save_to(train, test, path):
 def load_from(path):
     return pd.read_hdf(path, 'train'), pd.read_hdf(path, 'test')
 
-def add_features(train, test):
+def get_cat_features():
+    return ['n_tr', 'code_azs', 'location', 'region', 'code',
+           'code1', 'type', 'month', 'weekday']
+
+def add_features(train, test, sort=False):
+    
     # Number of first dates of a user
     train_num_frst_purch = train[['id', 'first_prch']].groupby('id').first_prch.nunique()
     train_num_frst_purch = pd.DataFrame(train_num_frst_purch).reset_index()
@@ -113,16 +118,14 @@ def add_features(train, test):
     test = test.merge(test_no_q_group, left_on='code', right_on='code', how='outer')
     test['oil_price'].fillna(0, inplace=True)
     test['oil_price'] = test['oil_price'].replace(np.inf, 0)
-    # reaches by 4 category: 25%, 50%, 75%
-    spend_by_users = train.groupby('id')['sum_b'].sum()
-    train['total_user_spend'] = train['id'].apply(lambda x: spend_by_users[x])
-    spend_by_users = test.groupby('id')['sum_b'].sum()
-    test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
     # time features
     train['month'] = train.date.dt.month
     train['weekday'] = train.date.dt.dayofweek
     test['month'] = test.date.dt.month
     test['weekday'] = test.date.dt.dayofweek
+    if sort:
+        train = train.sort_values(by=['id', 'date'])
+        test = test.sort_values(by=['id', 'date'])
     return train, test
 
 
@@ -153,17 +156,9 @@ def train_test_split(X_train, y_train, train_size=0.75):
     assert(X_train.id.nunique() == y_train.shape[0])
     split_id = X_train.id.unique()[train_size]
     split_index = np.where(X_train.id == split_id)[0].min()
-    return X_train.iloc[:split_index, :], X_train.iloc[split_index:, :],           y_train.iloc[:train_size], y_train.iloc[train_size:]
+    return X_train.iloc[:split_index, :], X_train.iloc[split_index:, :],\
+            y_train.iloc[:train_size], y_train.iloc[train_size:]
 
-def get_rich_category(user_spend):
-    if spend_by_users[user_id] < q25:
-        return 0
-    elif spend_by_users[user_id] < q50:
-        return 1
-    elif spend_by_users[user_id] < q75:
-        return 2
-    else:
-        return 3
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
               splits=3, interval=0, train_size=0.75, verbose=True):
@@ -189,20 +184,20 @@ def cross_val(clf, X_train, aggregate_func, return_proba=False,
         
         if verbose:
             print("Aggregating X_tr..")
-        X_tr = aggregate_func(X_tr)
+        X_tr = aggregate_func(X_tr, take_values=False)
         if verbose:
             print("Aggregating X_val..")
-        X_val = aggregate_func(X_val)
+        X_val = aggregate_func(X_val, take_values=False)
         
         if verbose:
             print("Fitting classifier..")
-        clf.fit(X_tr, y_tr)
+        clf.fit(X_tr.values, y_tr)
         pred = clf.predict_proba(X_val)[:, 1]
         scores.append(roc_auc_score(y_val, pred))
         if verbose:
             print("Target month: -{}. Score: {}".format(offset, scores[-1]))
             print("-------------------")
-        probas.append(pd.Series(pred, index=X_tr.id.unique()))
+        probas.append(pd.Series(pred, index=X_val.index))
     if verbose:
         print("Mean score is:", np.mean(scores))
     if return_proba:
@@ -226,7 +221,7 @@ def aggregate(df, take_values=True):
     'code':[unique_cnt],
 })
     if take_values:
-        return res.values
+        return res.values, res.index
     else:
         return res
 
