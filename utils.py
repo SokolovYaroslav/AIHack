@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta
 from datetime import datetime
+from sklearn.metrics import roc_auc_score
+from scipy import stats
 import os
 import math
 
