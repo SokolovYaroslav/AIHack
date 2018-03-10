@@ -314,8 +314,8 @@ mode_func = lambda x: stats.mode(x).mode[0]
 
 def aggregate(df, take_values=True):
     mode = lambda x: stats.mode(x).mode[0]
-    num_features = ['min', 'max', 'median', 'sum']
-    cat_features = [unique_cnt, 'min', 'max', mode]
+    num_features = ['min', 'max', 'mean', 'median', 'sum']
+    cat_features = [unique_cnt, mode]
     
     res = df.groupby('id')[['v_l', 'q', 'sum_b', 'location', 'code', 'percent', 'type', 'month',\
                             'weekday', 'code_azs','region', 'code1', 'oil_price', 'cur_points']].agg({
