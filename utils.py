@@ -106,18 +106,18 @@ def add_features(train, test, rolling_window=[], sort=False):
     train.v_l = train.v_l.apply(log)
     test.v_l = test.v_l.apply(log)
     # mean oil price for every oil type code
-    train_no_q = train[(train['q'] == 0) & (train['v_l'] > 0) & (train['sum_b'] > 0)]
+    train_no_q = train[(train['q'] == 0) & (train['sum_b'] > 0)]
     train_no_q['oil_price'] = train_no_q['sum_b'] / train_no_q['v_l']
     train_no_q_group = train_no_q[['code','oil_price']].groupby('code').agg('mean').reset_index()
     train = train.merge(train_no_q_group, left_on='code', right_on='code', how='outer')
     train['oil_price'].fillna(0, inplace=True)
-    train['oil_price'] = test['oil_price'].replace(np.inf, 0)
-    test_no_q = test[(test['q'] == 0) & (test['v_l'] > 0) & (test['sum_b'] > 0)]
+    train['oil_price'] = train['oil_price'].replace(np.inf, 0)
+    test_no_q = test[(test['q'] == 0) & (test['sum_b'] > 0)]
     test_no_q['oil_price'] = test_no_q['sum_b'] / test_no_q['v_l']
     test_no_q_group = test_no_q[['code','oil_price']].groupby('code').agg('mean').reset_index()
     test = test.merge(test_no_q_group, left_on='code', right_on='code', how='outer')
     test['oil_price'].fillna(0, inplace=True)
-    test['oil_price'] = test['oil_price'].replace(np.inf, 0)
+    test['oil_price'] = test['oil_price'].replace(np.inf, 0)  
     # triang 8 windows
     train_roll_mean = train[['date', 'sum_b']].set_index('date')
     train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
