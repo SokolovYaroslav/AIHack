@@ -182,6 +182,16 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     test['weekday'] = test.date.dt.dayofweek
     train['full_month'] = (train.date.dt.year - 2016)*12 + train.date.dt.month
     test['full_month'] = (test.date.dt.year - 2016)*12 + test.date.dt.month
+    train['days'] = (train.date.dt.year-2016)*365+train.date.dt.dayofyear
+    test['days'] = (test.date.dt.year-2016)*365+test.date.dt.dayofyear
+    train['time_weight'] = 1 / train.days
+    test['time_weight'] = 1 / test.days
+    train['hour'] = -9999
+    train.loc[~train.time.isnull(), 'hour'] = train.loc[~train.time.isnull(), 'time']\
+                                          .apply(lambda x: x.split(':')[0].strip()).astype(int)
+    test['hour'] = -9999
+    test.loc[~test.time.isnull(), 'hour'] = test.loc[~test.time.isnull(), 'time']\
+                                          .apply(lambda x: x.split(':')[0].strip()).astype(int)
     #train['hour'] = 
     # true percent
     train['tmp'] = train['cur_points']
