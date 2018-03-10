@@ -92,13 +92,6 @@ def add_features(train, test, rolling_window=[], sort=False):
     test_neg_count = test_neg[['id']].groupby('id').size().reset_index(name='return_num')
     test = test.merge(test_neg_count, left_on='id', right_on='id', how='outer')
     test['return_num'].fillna(0, inplace=True)
-     # spend_on_fuel
-    x = pd.DataFrame(np.array([train['id'], train['v_l'] * train['oil_price']]).T)
-    spend_on_fuel = x.groupby(0)[1].sum()
-    train['user_spend_fuel'] = train['id'].apply(lambda x: spend_on_fuel[x])
-    
-    x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
-    spend_on_fuel = x.groupby(0)[1].sum()
     # replace all first_prch with earliest first_prch
     train_first = train.groupby('id').first_prch.min().reset_index(name='first_prch')
     train = train.drop('first_prch', axis=1).merge(train_first, left_on='id', right_on='id', how='outer')
@@ -121,7 +114,14 @@ def add_features(train, test, rolling_window=[], sort=False):
     test_no_q_group = test_no_q[['code','oil_price']].groupby('code').agg('mean').reset_index()
     test = test.merge(test_no_q_group, left_on='code', right_on='code', how='outer')
     test['oil_price'].fillna(0, inplace=True)
-    test['oil_price'] = test['oil_price'].replace(np.inf, 0)  
+    test['oil_price'] = test['oil_price'].replace(np.inf, 0)
+    # spend_on_fuel
+    x = pd.DataFrame(np.array([train['id'], train['v_l'] * train['oil_price']]).T)
+    spend_on_fuel = x.groupby(0)[1].sum()
+    train['user_spend_fuel'] = train['id'].apply(lambda x: spend_on_fuel[x])
+    
+    x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
+    spend_on_fuel = x.groupby(0)[1].sum()
     # triang 8 windows
     train_roll_mean = train[['date', 'sum_b']].set_index('date')
     train_roll_mean_triang_8 = train_roll_mean.rolling(8, win_type='triang').mean().rename(index=str, columns={"sum_b": "roll_win_triang_8"})
