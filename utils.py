@@ -180,6 +180,9 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     train['weekday'] = train.date.dt.dayofweek
     test['month'] = test.date.dt.month
     test['weekday'] = test.date.dt.dayofweek
+    train['full_month'] = (train.date.dt.year - 2016)*12 + train.date.dt.month
+    test['full_month'] = (test.date.dt.year - 2016)*12 + test.date.dt.month
+    #train['hour'] = 
     # true percent
     train['tmp'] = train['cur_points']
     train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
@@ -235,15 +238,20 @@ def calculate_target(train, offset=0, sort_y=True, by_sum_b=False):
     X_train = train.loc[train.date.dt.month < target_month]
     
     dates = train.date.dt 
+    train['full_month'] = (dates.year - 2016)*12 + dates.month
+    
+    target_month = train.full_month.max() - offset
+    X_train = train.loc[train.full_month < target_month]
+    users_last_month = X_train.loc[X_train.full_month == target_month - 1].id.unique()
+    X_train = X_train.set_index('id').loc[users_last_month].reset_index()
+    #X_train = X_train.loc[X_train.loc[:, 'id'].apply(lambda x: x in users_last_month), :]
     
     if by_sum_b:
-        users = train.loc[(dates.month == target_month) &
-                          (dates.year == dates.year.max() - target_month // 12)].groupby('id')['sum_b']\
+        users = train.loc[train.full_month == target_month].groupby('id')['sum_b']\
                .apply(lambda gr: gr.fillna(gr.mean()).sum())
     else:
-        users = train.loc[(dates.month == target_month) & 
-                          (dates.year == dates.year.max() - target_month // 12)].id.unique()
-    #or aggregate by sum_b, see if the same
+        users = train.loc[train.full_month == target_month].id.unique()
+    
     users = np.intersect1d(users, X_train.id.unique())
     
     target = pd.Series(np.ones((X_train.id.nunique())), index=X_train.id.unique())
