@@ -113,6 +113,11 @@ def add_features(train, test):
     test = test.merge(test_no_q_group, left_on='code', right_on='code', how='outer')
     test['oil_price'].fillna(0, inplace=True)
     test['oil_price'] = test['oil_price'].replace(np.inf, 0)
+    # reaches by 4 category: 25%, 50%, 75%
+    spend_by_users = train.groupby('id')['sum_b'].sum()
+    train['total_user_spend'] = train['id'].apply(lambda x: spend_by_users[x])
+    spend_by_users = test.groupby('id')['sum_b'].sum()
+    test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
     # time features
     train['month'] = train.date.dt.month
     train['weekday'] = train.date.dt.dayofweek
@@ -150,6 +155,15 @@ def train_test_split(X_train, y_train, train_size=0.75):
     split_index = np.where(X_train.id == split_id)[0].min()
     return X_train.iloc[:split_index, :], X_train.iloc[split_index:, :],           y_train.iloc[:train_size], y_train.iloc[train_size:]
 
+def get_rich_category(user_spend):
+    if spend_by_users[user_id] < q25:
+        return 0
+    elif spend_by_users[user_id] < q50:
+        return 1
+    elif spend_by_users[user_id] < q75:
+        return 2
+    else:
+        return 3
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
               splits=3, interval=0, train_size=0.75, verbose=True):
