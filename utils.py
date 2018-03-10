@@ -1,9 +1,17 @@
 
 # coding: utf-8
+
+# In[1]:
+
+
 import pandas as pd
 import numpy as np
 from datetime import timedelta
 import os
+
+
+# In[2]:
+
 
 def load_data(resave=False):
     """
@@ -14,13 +22,30 @@ def load_data(resave=False):
     resave (bool): whether to respawn data.hdf again
     """
     if not os.path.isfile('data/data.hdf') or resave:
-        train = pd.read_csv('data/train_data.csv').drop('Unnamed: 0', axis=1)
-        test = pd.read_csv('data/test_data.csv').drop('Unnamed: 0', axis=1)
+        train = pd.read_csv('data/train_data.csv', low_memory=False).drop('Unnamed: 0', axis=1)
+        test = pd.read_csv('data/test_data.csv', low_memory=False).drop('Unnamed: 0', axis=1)
         train['date'] = pd.to_datetime(train.date)
         test['date'] = pd.to_datetime(test.date)
+        train['first_prch'] = train.first_prch.apply(lambda x: datetime.strptime(x, '%d.%m.%y %H:%M:%S'))
+        test['first_prch'] = test.first_prch.apply(lambda x: datetime.strptime(x, '%d.%m.%y %H:%M:%S'))
         train.to_hdf('data/data.hdf', 'train')
         test.to_hdf('data/data.hdf', 'test')
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
+
+
+# In[3]:
+
+
+#get_ipython().run_cell_magic('time', '', 'train, test = load_data()')
+
+
+# In[4]:
+
+
+#train['date'] = pd.to_datetime(train.date)
+
+
+# In[5]:
 
 
 def calculate_target(train, offset=0):
@@ -37,9 +62,12 @@ def calculate_target(train, offset=0):
     #or aggregate by sum_b, see if the same
     users = np.intersect1d(users, X_train.id.unique())
     
-    target = pd.Series(np.ones((X_train.id.nunique())), index=X_train.id.unique())
-    target.loc[users] = 0
+    target = pd.Series(np.zeros((X_train.id.nunique())), index=X_train.id.unique())
+    target.loc[users] = 1
     return X_train, target
+
+
+# In[6]:
 
 
 def train_test_split(X_train, y_train, train_size=0.75):
@@ -53,6 +81,14 @@ def train_test_split(X_train, y_train, train_size=0.75):
 
 # Example usage:
 
+# In[7]:
+
+
 #X_train, y_train = calculate_target(train, offset=0)
+
+
+# In[8]:
+
+
 #X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train)
 
