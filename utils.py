@@ -250,8 +250,14 @@ def add_features(train, test, rolling_window=[], sort=False):
                 left_on='id', right_on='id', how='outer')
     test = test.merge(test.groupby(['id', 'month']).code_azs.nunique().reset_index(name='azs_monthly_change'),
                         left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
-    
-    
+     # sum of oil bought
+    sum_v_l_usr_tr = train[['id', 'v_l']].groupby('id').sum()
+    sum_v_l_usr_tr = sum_v_l_usr_tr.rename(index=str, columns={"v_l": "sum_v_l"}).reset_index()
+    train = train.merge(sum_v_l_usr_tr, left_on='id', right_on='id', how='outer')
+    sum_v_l_usr_test = test[['id', 'v_l']].groupby('id').sum()
+    sum_v_l_usr_test = sum_v_l_usr_test.rename(index=str, columns={"v_l": "sum_v_l"}).reset_index()
+    test = test.merge(sum_v_l_usr_test, left_on='id', right_on='id', how='outer')
+                      
     # logarithmic values
     train.sum_b = train.sum_b.apply(log)
     test.sum_b = test.sum_b.apply(log)
