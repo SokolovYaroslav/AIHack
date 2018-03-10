@@ -109,14 +109,27 @@ def add_features(train, test):
     test['oil_price'] = test['oil_price'].replace(np.inf, 0)
     # reaches by 4 category: 25%, 50%, 75%
     spend_by_users = train.groupby('id')['sum_b'].sum()
+    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
     train['total_user_spend'] = train['id'].apply(lambda x: spend_by_users[x])
+    train['rich_category'] = train['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
+    
     spend_by_users = test.groupby('id')['sum_b'].sum()
+    q25, q50, q75 = [i for i in spend_by_users.describe()[['25%', '50%', '75%']]]
     test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
+    test['rich_category'] = test['total_user_spend'].apply(lambda x: get_rich_category(x, q25, q50, q75))
     # time features
     train['month'] = train.date.dt.month
     train['weekday'] = train.date.dt.dayofweek
     test['month'] = test.date.dt.month
     test['weekday'] = test.date.dt.dayofweek
+    # spend_on_fuel
+    x = pd.DataFrame(np.array([train['id'], train['v_l'] * train['oil_price']]).T)
+    spend_on_fuel = x.groupby(0)[1].sum()
+    train['user_spend_fuel'] = train['id'].apply(lambda x: spend_on_fuel[x])
+    
+    x = pd.DataFrame(np.array([test['id'], test['v_l'] * test['oil_price']]).T)
+    spend_on_fuel = x.groupby(0)[1].sum()
+    test['user_spend_fuel'] = test['id'].apply(lambda x: spend_on_fuel[x])
     return train, test
 
 
@@ -149,12 +162,12 @@ def train_test_split(X_train, y_train, train_size=0.75):
     split_index = np.where(X_train.id == split_id)[0].min()
     return X_train.iloc[:split_index, :], X_train.iloc[split_index:, :],           y_train.iloc[:train_size], y_train.iloc[train_size:]
 
-def get_rich_category(user_spend):
-    if spend_by_users[user_id] < q25:
+def get_rich_category(user_spend, q25, q50, q75):
+    if user_spend < q25:
         return 0
-    elif spend_by_users[user_id] < q50:
+    elif user_spend < q50:
         return 1
-    elif spend_by_users[user_id] < q75:
+    elif user_spend < q75:
         return 2
     else:
         return 3
