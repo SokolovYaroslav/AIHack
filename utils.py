@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # In[1]:
@@ -207,6 +206,27 @@ def add_features(train, test, rolling_window=[], sort=False):
     test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
     test['true_percent'] = ((test.loc[:,'percent'] / test.loc[:,'cur_points']) * 100).fillna(0)
     test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    # number of purchases of a user
+    purch_num_tr = train[['id', 'sum_b']].groupby('id').agg('count')
+    purch_num_tr = purch_num_tr.rename(index=str, columns={"sum_b": "num_purch"}).reset_index()
+    train = train.merge(purch_num_tr, left_on='id', right_on='id', how='outer')
+    purch_num_test = test[['id', 'sum_b']].groupby('id').agg('count')
+    purch_num_test = purch_num_test.rename(index=str, columns={"sum_b": "num_purch"}).reset_index()
+    train = test.merge(purch_num_test, left_on='id', right_on='id', how='outer')
+    # location type mostly preferred by a customer
+    location_usr_tr = train[['id', 'location']].groupby('id').agg(pd.Series.mode)
+    loc_user_pref_tr = location_usr_tr.rename(index=str, columns={"location": "loc_user_pref"}).reset_index()
+    train = train.merge(loc_user_pref_tr, left_on='id', right_on='id', how='outer')
+    location_usr_test = test[['id', 'location']].groupby('id').agg(pd.Series.mode)
+    loc_user_pref_test = location_usr_test.rename(index=str, columns={"location": "loc_user_pref"}).reset_index()
+    test = test.merge(loc_user_pref_test, left_on='id', right_on='id', how='outer')
+    # payment type mostly preferred by a customer
+    type_usr_tr = train[['id', 'type']].groupby('id').agg(pd.Series.mode)
+    type_user_pref_tr = type_usr_tr.rename(index=str, columns={"type": "type_user_pref"}).reset_index()
+    train = train.merge(type_user_pref_tr, left_on='id', right_on='id', how='outer')
+    type_usr_test = test[['id', 'type']].groupby('id').agg(pd.Series.mode)
+    type_user_pref_test = type_usr_test.rename(index=str, columns={"type": "type_user_pref"}).reset_index()
+    test = test.merge(type_user_pref_test, left_on='id', right_on='id', how='outer')
     # logarithmic values
     train.sum_b = train.sum_b.apply(log)
     test.sum_b = test.sum_b.apply(log)
@@ -347,4 +367,3 @@ def aggregate(df, take_values=True):
 #X_train, y_train = calculate_target(train, offset=0)
 
 #X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train)
-
