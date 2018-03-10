@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # In[1]:
@@ -208,6 +207,58 @@ def add_features(train, test, rolling_window=[], sort=False):
     test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
     test['true_percent'] = ((test.loc[:,'percent'] / test.loc[:,'cur_points']) * 100).fillna(0)
     test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    # number of purchases of a user
+    purch_num_tr = train[['id', 'sum_b']].groupby('id').agg('count')
+    purch_num_tr = purch_num_tr.rename(index=str, columns={"sum_b": "num_purch"}).reset_index()
+    train = train.merge(purch_num_tr, left_on='id', right_on='id', how='outer')
+    purch_num_test = test[['id', 'sum_b']].groupby('id').agg('count')
+    purch_num_test = purch_num_test.rename(index=str, columns={"sum_b": "num_purch"}).reset_index()
+    train = test.merge(purch_num_test, left_on='id', right_on='id', how='outer')
+    # location type mostly preferred by a customer
+    location_usr_tr = train[['id', 'location']].groupby('id').agg(pd.Series.mode)
+    loc_user_pref_tr = location_usr_tr.rename(index=str, columns={"location": "loc_user_pref"}).reset_index()
+    train = train.merge(loc_user_pref_tr, left_on='id', right_on='id', how='outer')
+    location_usr_test = test[['id', 'location']].groupby('id').agg(pd.Series.mode)
+    loc_user_pref_test = location_usr_test.rename(index=str, columns={"location": "loc_user_pref"}).reset_index()
+    test = test.merge(loc_user_pref_test, left_on='id', right_on='id', how='outer')
+    # payment type mostly preferred by a customer
+    type_usr_tr = train[['id', 'type']].groupby('id').agg(pd.Series.mode)
+    type_user_pref_tr = type_usr_tr.rename(index=str, columns={"type": "type_user_pref"}).reset_index()
+    train = train.merge(type_user_pref_tr, left_on='id', right_on='id', how='outer')
+    type_usr_test = test[['id', 'type']].groupby('id').agg(pd.Series.mode)
+    type_user_pref_test = type_usr_test.rename(index=str, columns={"type": "type_user_pref"}).reset_index()
+    test = test.merge(type_user_pref_test, left_on='id', right_on='id', how='outer')
+    # add monthly and average fuel value, sum_b and azs change
+    train['month'] = train.date.apply(lambda date: (date.year - 2016) * 12 + date.month)
+    train = train.merge(train.groupby(['id', 'month']).v_l.sum().reset_index(name='monthly_V'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    train = train.merge(train.groupby('id').monthly_V.mean().reset_index(name='mean_V'),
+                left_on='id', right_on='id', how='outer')
+    train = train.merge(train.groupby(['id', 'month']).sum_b.sum().reset_index(name='monthly_sum_b'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    train = train.merge(train.groupby('id').monthly_sum_b.mean().reset_index(name='mean_sum_b'),
+                left_on='id', right_on='id', how='outer')
+    train = train.merge(train.groupby(['id', 'month']).code_azs.nunique().reset_index(name='azs_monthly_change'),
+                        left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    test['month'] = test.date.apply(lambda date: (date.year - 2016) * 12 + date.month)
+    test = test.merge(test.groupby(['id', 'month']).v_l.sum().reset_index(name='monthly_V'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    test = test.merge(test.groupby('id').monthly_V.mean().reset_index(name='mean_V'),
+                left_on='id', right_on='id', how='outer')
+    test = test.merge(test.groupby(['id', 'month']).sum_b.sum().reset_index(name='monthly_sum_b'), 
+                left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+    test = test.merge(test.groupby('id').monthly_sum_b.mean().reset_index(name='mean_sum_b'),
+                left_on='id', right_on='id', how='outer')
+    test = test.merge(test.groupby(['id', 'month']).code_azs.nunique().reset_index(name='azs_monthly_change'),
+                        left_on=['id', 'month'], right_on=['id', 'month'], how='outer')
+     # sum of oil bought
+    sum_v_l_usr_tr = train[['id', 'v_l']].groupby('id').sum()
+    sum_v_l_usr_tr = sum_v_l_usr_tr.rename(index=str, columns={"v_l": "sum_v_l"}).reset_index()
+    train = train.merge(sum_v_l_usr_tr, left_on='id', right_on='id', how='outer')
+    sum_v_l_usr_test = test[['id', 'v_l']].groupby('id').sum()
+    sum_v_l_usr_test = sum_v_l_usr_test.rename(index=str, columns={"v_l": "sum_v_l"}).reset_index()
+    test = test.merge(sum_v_l_usr_test, left_on='id', right_on='id', how='outer')
+                      
     # logarithmic values
     train.sum_b = train.sum_b.apply(log)
     test.sum_b = test.sum_b.apply(log)
@@ -348,4 +399,3 @@ def aggregate(df, take_values=True):
 #X_train, y_train = calculate_target(train, offset=0)
 
 #X_tr, X_val, y_tr, y_val = train_test_split(X_train, y_train)
-
