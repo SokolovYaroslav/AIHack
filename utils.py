@@ -35,25 +35,41 @@ def load_data(resave=False):
         test['date'] = pd.to_datetime(test.date)
         train['first_prch'] = train.first_prch.apply(lambda x: datetime.strptime(x, '%d.%m.%y %H:%M:%S'))
         test['first_prch'] = test.first_prch.apply(lambda x: datetime.strptime(x, '%d.%m.%y %H:%M:%S'))
-        #Count returns
+        # Count returns of product
         train_neg = train[train['sum_b'] < 0]
         train_neg_count = train_neg[['id']].groupby('id').size().reset_index(name='return_num')
         train = train.merge(train_neg_count, left_on='id', right_on='id', how='outer')
+        train['return_num'].fillna(0, inplace=True)
         test_neg = test[test['sum_b'] < 0]
         test_neg_count = test_neg[['id']].groupby('id').size().reset_index(name='return_num')
         test = test.merge(test_neg_count, left_on='id', right_on='id', how='outer')
-        #replace all first_prch with earliest first_prch
+        test['return_num'].fillna(0, inplace=True)
+        # replace all first_prch with earliest first_prch
         train_first = train.groupby('id').first_prch.min().reset_index(name='first_prch')
         train = train.drop('first_prch', axis=1).merge(train_first, left_on='id', right_on='id', how='outer')
         test_first = test.groupby('id').first_prch.min().reset_index(name='first_prch')
         test = test.drop('first_prch', axis=1).merge(test_first, left_on='id', right_on='id', how='outer')
-        #log
-        train.sum_b.apply(log)
-        test.sum_b.apply(log)
-        train.q.apply(log)
-        test.q.apply(log)
-        train.v_l.apply(log)
-        test.v_l.apply(log)
+        # logarithmic values
+        train.sum_b.apply(log, inplace=True)
+        test.sum_b.apply(log, inplace=True)
+        train.q.apply(log, inplace=True)
+        test.q.apply(log, inplace=True)
+        train.v_l.apply(log, inplace=True)
+        test.v_l.apply(log, inplace=True)
+        # mean oil price for every oil type code
+        train_no_q = train[train['q'] == 0]
+        train_no_q['oil_price'] = train_no_q['sum_b'] / train_no_q['v_l']
+        train_no_q_group = train_no_q[['code','oil_price']].groupby('code').agg('mean').reset_index()
+        train = train.merge(train_no_q_group, left_on='code', right_on='code', how='outer')
+        train['oil_price'].fillna(0, inplace=True)
+        train['oil_price'] = train['oil_price'].replace(np.inf, 0)
+        test_no_q = test[test['q'] == 0]
+        test_no_q['oil_price'] = test_no_q['sum_b'] / test_no_q['v_l']
+        test_no_q_group = test_no_q[['code','oil_price']].groupby('code').agg('mean').reset_index()
+        test = test.merge(test_no_q_group, left_on='code', right_on='code', how='outer')
+        test['oil_price'].fillna(0, inplace=True)
+        test['oil_price'] = test['oil_price'].replace(np.inf, 0)
+        
         train.to_hdf('data/data.hdf', 'train')
         test.to_hdf('data/data.hdf', 'test')
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
