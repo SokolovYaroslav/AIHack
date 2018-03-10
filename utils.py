@@ -13,7 +13,7 @@ import math
 
 def log(x):
     if x <= 0:
-        return -math.log(-(x - 1))
+        return -math.log(-x - 1)
     else: 
         return math.log(x + 1)
 
@@ -50,8 +50,12 @@ def load_data(resave=False):
         test_first = test.groupby('id').first_prch.min().reset_index(name='first_prch')
         test = test.drop('first_prch', axis=1).merge(test_first, left_on='id', right_on='id', how='outer')
         # logarithmic values
-        train.sum_b.apply(log)
-        test.sum_b.apply(log)
+        train.sum_b = train.sum_b.apply(log, inplace=True)
+        test.sum_b = test.sum_b.apply(log, inplace=True)
+        train.q = train.q.apply(log, inplace=True)
+        test.q = test.q.apply(log, inplace=True)
+        train.v_l = train.v_l.apply(log, inplace=True)
+        test.v_l = test.v_l.apply(log, inplace=True)
         # mean oil price for every oil type code
         train_no_q = train[train['q'] == 0]
         train_no_q['oil_price'] = train_no_q['sum_b'] / train_no_q['v_l']
