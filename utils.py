@@ -7,8 +7,15 @@
 import pandas as pd
 import numpy as np
 from datetime import timedelta
+from datetime import datetime
 import os
+import math
 
+def log(x):
+    if x <= 0:
+        return -math.log(-(x - 1))
+    else: 
+        return math.log(x + 1)
 
 # In[2]:
 
@@ -28,6 +35,25 @@ def load_data(resave=False):
         test['date'] = pd.to_datetime(test.date)
         train['first_prch'] = train.first_prch.apply(lambda x: datetime.strptime(x, '%d.%m.%y %H:%M:%S'))
         test['first_prch'] = test.first_prch.apply(lambda x: datetime.strptime(x, '%d.%m.%y %H:%M:%S'))
+        #Count returns
+        train_neg = train[train['sum_b'] < 0]
+        train_neg_count = train_neg[['id']].groupby('id').size().reset_index(name='return_num')
+        train = train.merge(train_neg_count, left_on='id', right_on='id', how='outer')
+        test_neg = test[test['sum_b'] < 0]
+        test_neg_count = test_neg[['id']].groupby('id').size().reset_index(name='return_num')
+        test = test.merge(test_neg_count, left_on='id', right_on='id', how='outer')
+        #replace all first_prch with earliest first_prch
+        train_first = train.groupby('id').first_prch.min().reset_index(name='first_prch')
+        train = train.drop('first_prch', axis=1).merge(train_first, left_on='id', right_on='id', how='outer')
+        test_first = test.groupby('id').first_prch.min().reset_index(name='first_prch')
+        test = test.drop('first_prch', axis=1).merge(test_first, left_on='id', right_on='id', how='outer')
+        #log
+        train.sum_b.apply(log)
+        test.sum_b.apply(log)
+        train.q.apply(log)
+        test.q.apply(log)
+        train.v_l.apply(log)
+        test.v_l.apply(log)
         train.to_hdf('data/data.hdf', 'train')
         test.to_hdf('data/data.hdf', 'test')
     return pd.read_hdf('data/data.hdf', 'train'), pd.read_hdf('data/data.hdf', 'test')
