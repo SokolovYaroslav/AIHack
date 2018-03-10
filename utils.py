@@ -20,7 +20,7 @@ def log(x):
 # In[2]:
 
 
-def load_data(resave=False, points=True):
+def load_data(resave=False, points=True, sort=False):
     """
     If data.hdf doesn't exist, creates it (from train_data.csv and test_data.csv),
     dropping from train & test 'Unnamed: 0' and transforming date to datetime
@@ -38,6 +38,9 @@ def load_data(resave=False, points=True):
     if not os.path.isfile('data/data.hdf') or resave:
         train = pd.read_csv(train_path, low_memory=False)
         test = pd.read_csv(test_path, low_memory=False)
+        if sort:
+            train = train.sort_values(by=['id', 'date'])
+            test = test.sort_values(by=['id', 'date'])
         if 'Unnamed: 0' in train.columns:
             train = train.drop('Unnamed: 0', axis=1)
             test = test.drop('Unnamed: 0', axis=1)
@@ -109,10 +112,15 @@ def add_features(train, test):
     train['total_user_spend'] = train['id'].apply(lambda x: spend_by_users[x])
     spend_by_users = test.groupby('id')['sum_b'].sum()
     test['total_user_spend'] = test['id'].apply(lambda x: spend_by_users[x])
+    # time features
+    train['month'] = train.date.dt.month
+    train['weekday'] = train.date.dt.dayofweek
+    test['month'] = test.date.dt.month
+    test['weekday'] = test.date.dt.dayofweek
     return train, test
 
 
-def calculate_target(train, offset=0):
+def calculate_target(train, offset=0, sort_y=True):
     """
     Returns X_train without last 30 days and Series with index=ids, values=target
     Target is built only for users who were present in the X_train (w\o last 30 days)
@@ -126,8 +134,11 @@ def calculate_target(train, offset=0):
     #or aggregate by sum_b, see if the same
     users = np.intersect1d(users, X_train.id.unique())
     
-    target = pd.Series(np.zeros((X_train.id.nunique())), index=X_train.id.unique())
-    target.loc[users] = 1
+    target = pd.Series(np.ones((X_train.id.nunique())), index=X_train.id.unique())
+    target.loc[users] = 0
+    if sort_y:
+        target = target.sort_index()
+        
     return X_train, target
 
 def train_test_split(X_train, y_train, train_size=0.75):
@@ -147,6 +158,75 @@ def get_rich_category(user_spend):
         return 2
     else:
         return 3
+
+def cross_val(clf, X_train, aggregate_func, return_proba=False,
+              splits=3, interval=0, train_size=0.75, verbose=True):
+    """
+    Makes a few splits, in each of them makes train_test_split with a new offset,
+    then applies aggregate_func to X_tr and X_val. Trains clf on (X_tr, y_tr),
+    counts roc_auc_score and appends it to scores.
+    
+    aggregate_func (func): takes X dataset and aggregates by id. Should return 
+                           either DF with non-multi index, or numpy 2D-array
+    return_proba (bool): if True, returns (scores, probas)
+                         if False, returns only scores
+    """
+    scores = []
+    probas = []
+    for split_ind in range(splits):
+        if verbose:
+            print("Split №", split_ind)
+        
+        offset = split_ind*(1+interval)
+        X, y = calculate_target(X_train, offset=offset)
+        X_tr, X_val, y_tr, y_val = train_test_split(X, y, train_size=train_size)
+        
+        if verbose:
+            print("Aggregating X_tr..")
+        X_tr = aggregate_func(X_tr)
+        if verbose:
+            print("Aggregating X_val..")
+        X_val = aggregate_func(X_val)
+        
+        if verbose:
+            print("Fitting classifier..")
+        clf.fit(X_tr, y_tr)
+        pred = clf.predict_proba(X_val)[:, 1]
+        scores.append(roc_auc_score(y_val, pred))
+        if verbose:
+            print("Target month: -{}. Score: {}".format(offset, scores[-1]))
+            print("-------------------")
+        probas.append(pd.Series(pred, index=X_tr.id.unique()))
+    if verbose:
+        print("Mean score is:", np.mean(scores))
+    if return_proba:
+        return scores, probas
+    return scores
+
+def unique_cnt(series):
+    return series.unique().shape[0]
+
+mode_func = lambda x: stats.mode(x).mode[0]
+
+def get_aggregate(df):
+    return df.groupby('id')[['v_l', 'q', 'sum_b', 'location', 'code', 'percent', 'type', 'month',\
+                            'weekday', 'code_azs','region', 'code1', 'oil_price', 'cur_points']].agg({
+    'v_l':['min', 'max', 'median', 'sum'],
+    'q':['min', 'max', 'median', 'sum'],
+    'sum_b':['min', 'max', 'median', 'sum'],
+    'location':[unique_cnt, 'min', 'max', mode_func],
+    'code':[unique_cnt],
+    'percent':['min', 'max', 'median', 'sum'],
+    'type':[unique_cnt, 'min', 'max', mode_func],
+    'month':[unique_cnt, 'min', 'max', mode_func],
+    'weekday':[unique_cnt, 'min', 'max', mode_func],
+    'code_azs':[unique_cnt, 'min', 'max', mode_func],
+    'region':[unique_cnt, 'min', 'max', mode_func],
+    'code1':[unique_cnt, 'min', 'max', mode_func],
+    'oil_price':['min', 'max', 'median', 'sum'],
+    'cur_points':['min', 'max', 'median', 'sum']
+}).values
+
 
 # Example usage:
 
