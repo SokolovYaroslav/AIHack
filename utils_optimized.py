@@ -173,7 +173,7 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
 #     train = train.append(train_roll_mean_blackmanharris_8, ignore_index=True)
 #     test_roll_mean = test[['date', 'sum_b']].set_index('date')
 #     test_roll_mean_blackmanharris_8 = test_roll_mean.rolling(8, win_type='blackmanharris').mean().rename(index=str, columns={"sum_b": "roll_win_blackmanharris_8"})
-#     test = test.append(test_roll_mean_blackmanharris_8, ignore_index=True)
+#     test = test.apqpend(test_roll_mean_blackmanharris_8, ignore_index=True)
 
     # time features
     train['month'] = train.date.dt.month
@@ -198,31 +198,31 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     #days_last = test.groupby('id')['days'].apply(lambda df: max_day - df.iloc[-1])
     #test = test.merge(days_last.reset_index().rename(columns={'days': 'days_since_last'}), on='id')
     # true percent
-    #train['tmp'] = train['cur_points']
-    #train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
-    #train = train.merge(train.groupby('id').tmp.min().reset_index(name='min_point_bal'),
-    #           left_on='id', right_on='id', how='outer')
-    #train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'min_point_bal']
-    #train['tmp'] = train.loc[:, 'cur_points'] - train.loc[:, 'percent']
-    #train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
-    #train = train.merge(train.groupby('id').tmp.min().reset_index(name='tmp_1'),
-    #                    left_on='id', right_on='id', how='outer')
-    #train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'tmp_1']
+    train['tmp'] = train['cur_points']
+    train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
+    train = train.merge(train.groupby('id').tmp.min().reset_index(name='min_point_bal'),
+               left_on='id', right_on='id', how='outer')
+    train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'min_point_bal']
+    train['tmp'] = train.loc[:, 'cur_points'] - train.loc[:, 'percent']
+    train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
+    train = train.merge(train.groupby('id').tmp.min().reset_index(name='tmp_1'),
+                        left_on='id', right_on='id', how='outer')
+    train['cur_points'] = train.loc[:, 'cur_points'] - train.loc[:, 'tmp_1']
     train['true_percent'] = ((train.loc[:,'percent'] / train.loc[:,'cur_points']) * 100).fillna(0)
-    #train.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    train.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
     
-    #test['tmp'] = test['cur_points']
-    #test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
-    #test = test.merge(test.groupby('id').tmp.min().reset_index(name='min_point_bal'),
-    #            left_on='id', right_on='id', how='outer')
-    #test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'min_point_bal']
-    #test['tmp'] = test.loc[:, 'cur_points'] - test.loc[:, 'percent']
-    #test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
-    #test = test.merge(test.groupby('id').tmp.min().reset_index(name='tmp_1'),
-    #                    left_on='id', right_on='id', how='outer')
-    #test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
+    test['tmp'] = test['cur_points']
+    test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
+    test = test.merge(test.groupby('id').tmp.min().reset_index(name='min_point_bal'),
+                left_on='id', right_on='id', how='outer')
+    test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'min_point_bal']
+    test['tmp'] = test.loc[:, 'cur_points'] - test.loc[:, 'percent']
+    test.tmp = test.tmp.apply(lambda x: x if x < 0 else 0)
+    test = test.merge(test.groupby('id').tmp.min().reset_index(name='tmp_1'),
+                        left_on='id', right_on='id', how='outer')
+    test['cur_points'] = test.loc[:, 'cur_points'] - test.loc[:, 'tmp_1']
     test['true_percent'] = ((test.loc[:,'percent'] / test.loc[:,'cur_points']) * 100).fillna(0)
-    #test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
+    test.drop(['tmp', 'tmp_1', 'min_point_bal'], axis=1, inplace=True)
     # logarithmic values
     train.sum_b = train.sum_b.apply(log)
     test.sum_b = test.sum_b.apply(log)
