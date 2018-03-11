@@ -192,7 +192,11 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     test['hour'] = -9999
     test.loc[~test.time.isnull(), 'hour'] = test.loc[~test.time.isnull(), 'time']\
                                           .apply(lambda x: x.split(':')[0].strip()).astype(int)
-    #train['hour'] = 
+    max_day = train.days.max()
+    days_last = train.groupby('id')['days'].apply(lambda df: max_day - df.iloc[-1])
+    train = train.merge(days_last.reset_index().rename(columns={'days': 'days_since_last'}), on='id')
+    days_last = test.groupby('id')['days'].apply(lambda df: max_day - df.iloc[-1])
+    test = test.merge(days_last.reset_index().rename(columns={'days': 'days_since_last'}), on='id')
     # true percent
     train['tmp'] = train['cur_points']
     train.tmp = train.tmp.apply(lambda x: x if x < 0 else 0)
@@ -289,9 +293,20 @@ def get_rich_category(user_spend, q25, q50, q75):
         return 2
     else:
         return 3
+    
+def save_split(file, X_tr, X_val, y_tr, y_val,num):
+    X_tr.to_hdf(file, 'X_tr'+num)
+    X_val.to_hdf(file, 'X_val'+num)
+    y_tr.to_hdf(file, 'y_tr'+num)
+    y_val.to_hdf(file, 'y_val'+num)
+    
+    
+def load_split(file, num):
+    return pd.read_hdf(file, 'X_tr', num), pd.read_hdf(file, 'X_tr', num), 
+            pd.read_hdf(file, 'y_tr', num), pd.read_hdf(file, 'y_val', num)
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
-              splits=3, interval=0, train_size=0.75, verbose=True):
+              splits=3, interval=0, train_size=0.75, verbose=True, splits_file=None):
     """
     Makes a few splits, in each of them makes train_test_split with a new offset,
     then applies aggregate_func to X_tr and X_val. Trains clf on (X_tr, y_tr),
@@ -309,8 +324,14 @@ def cross_val(clf, X_train, aggregate_func, return_proba=False,
             print("Split №", split_ind)
         
         offset = split_ind*(1+interval)
-        X, y = calculate_target(X_train, offset=offset)
-        X_tr, X_val, y_tr, y_val = train_test_split(X, y, train_size=train_size)
+        if splits_file == None:
+            X, y = calculate_target(X_train, offset=offset)
+            X_tr, X_val, y_tr, y_val = train_test_split(X, y, train_size=train_size)
+            if verbose:
+                print("Adding features...")
+        else:
+            X_tr, X_val, y_tr, y_val = load_split(split_file, offset)
+        X_tr, X_val = add_features(X_tr, X_val, sort=True)
         
         if verbose:
             print("Aggregating X_tr..")
