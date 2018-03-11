@@ -299,6 +299,7 @@ def get_rich_category(user_spend, q25, q50, q75):
         return 3
     
 def save_split(file, X_tr, X_val, y_tr, y_val,num):
+    num = str(num)
     X_tr.to_hdf(file, 'X_tr'+num)
     X_val.to_hdf(file, 'X_val'+num)
     y_tr.to_hdf(file, 'y_tr'+num)
@@ -306,11 +307,13 @@ def save_split(file, X_tr, X_val, y_tr, y_val,num):
     
     
 def load_split(file, num):
-    return pd.read_hdf(file, 'X_tr', num), pd.read_hdf(file, 'X_tr', num), \
-           pd.read_hdf(file, 'y_tr', num), pd.read_hdf(file, 'y_val', num)
+    num = str(num)
+    return pd.read_hdf(file, 'X_tr'+num), pd.read_hdf(file, 'X_val'+num), \
+            pd.read_hdf(file, 'y_tr'+num), pd.read_hdf(file, 'y_val'+num)
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
-              splits=3, interval=0, train_size=0.75, verbose=True, splits_file=None):
+              splits=3, interval=0, train_size=0.75, verbose=True, splits_file=None,
+             cat_features=None):
     """
     Makes a few splits, in each of them makes train_test_split with a new offset,
     then applies aggregate_func to X_tr and X_val. Trains clf on (X_tr, y_tr),
@@ -333,20 +336,24 @@ def cross_val(clf, X_train, aggregate_func, return_proba=False,
             X_tr, X_val, y_tr, y_val = train_test_split(X, y, train_size=train_size)
             if verbose:
                 print("Adding features...")
+            X_tr, X_val = add_features(X_tr, X_val, sort=True)
+            if verbose:
+                print("Aggregating X_tr..")
+            X_tr = aggregate_func(X_tr, take_values=False)
+            if verbose:
+                print("Aggregating X_val..")
+            X_val = aggregate_func(X_val, take_values=False)
         else:
-            X_tr, X_val, y_tr, y_val = load_split(split_file, offset)
-        X_tr, X_val = add_features(X_tr, X_val, sort=True)
-        
-        if verbose:
-            print("Aggregating X_tr..")
-        X_tr = aggregate_func(X_tr, take_values=False)
-        if verbose:
-            print("Aggregating X_val..")
-        X_val = aggregate_func(X_val, take_values=False)
+            X_tr, X_val, y_tr, y_val = load_split(splits_file, offset)
         
         if verbose:
             print("Fitting classifier..")
-        clf.fit(X_tr.values, y_tr)
+        
+        if cat_features is not None:
+            clf.fit(X_tr.values, y_tr, cat_features=cat_features)
+        else:
+            clf.fit(X_tr.values, y_tr)
+            
         pred = clf.predict_proba(X_val)[:, 1]
         scores.append(roc_auc_score(y_val, pred))
         if verbose:
