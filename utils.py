@@ -306,7 +306,7 @@ def save_split(file, X_tr, X_val, y_tr, y_val,num):
     
     
 def load_split(file, num):
-    return pd.read_hdf(file, 'X_tr', num), pd.read_hdf(file, 'X_tr', num), 
+    return pd.read_hdf(file, 'X_tr', num), pd.read_hdf(file, 'X_tr', num), \
             pd.read_hdf(file, 'y_tr', num), pd.read_hdf(file, 'y_val', num)
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
