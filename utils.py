@@ -184,15 +184,16 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     test['full_month'] = (test.date.dt.year - 2016)*12 + test.date.dt.month
     train['days'] = (train.date.dt.year-2016)*365+train.date.dt.dayofyear
     test['days'] = (test.date.dt.year-2016)*365+test.date.dt.dayofyear
-    train['time_weight'] = 1 / train.days
-    test['time_weight'] = 1 / test.days
+    max_day = train.days.max()
+    train['time_weight'] = 1 / (max_day - train.days + 1)
+    max_day = test.days.max()
+    test['time_weight'] = 1 / (max_day - test.days + 1)
     train['hour'] = -9999
     train.loc[~train.time.isnull(), 'hour'] = train.loc[~train.time.isnull(), 'time']\
                                           .apply(lambda x: x.split(':')[0].strip()).astype(int)
     test['hour'] = -9999
     test.loc[~test.time.isnull(), 'hour'] = test.loc[~test.time.isnull(), 'time']\
                                           .apply(lambda x: x.split(':')[0].strip()).astype(int)
-    max_day = train.days.max()
     days_last = train.groupby('id')['days'].apply(lambda df: max_day - df.iloc[-1])
     train = train.merge(days_last.reset_index().rename(columns={'days': 'days_since_last'}), on='id')
     days_last = test.groupby('id')['days'].apply(lambda df: max_day - df.iloc[-1])
@@ -234,6 +235,10 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     test.total_user_spend = test.total_user_spend.apply(log)
     train.user_spend_fuel = train.user_spend_fuel.apply(log)
     test.user_spend_fuel = test.user_spend_fuel.apply(log)
+    
+    for col in ['sum_b', 'v_l','q', 'percent']:
+        train[col+"_tw"] = train[col]*train['time_weight']
+        test[col + "_tw"] = test[col]*test['time_weight']
     
     if sort:
         train = train.sort_values(by=['id', 'date'])
@@ -303,7 +308,7 @@ def save_split(file, X_tr, X_val, y_tr, y_val,num):
     
 def load_split(file, num):
     return pd.read_hdf(file, 'X_tr', num), pd.read_hdf(file, 'X_tr', num), \
-           pd.read_hdf(file, 'y_tr', num), pd.read_hdf(file, 'y_val', num)
+            pd.read_hdf(file, 'y_tr', num), pd.read_hdf(file, 'y_val', num)
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
               splits=3, interval=0, train_size=0.75, verbose=True, splits_file=None):
