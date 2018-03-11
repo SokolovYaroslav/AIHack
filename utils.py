@@ -235,6 +235,10 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     train.user_spend_fuel = train.user_spend_fuel.apply(log)
     test.user_spend_fuel = test.user_spend_fuel.apply(log)
     
+    for col in ['sum_b', 'v_l','q', 'percent']:
+        train[col+"_tw"] = train[col]*train['time_weight']
+        test[col + "_tw"] = test[col]*test['time_weight']
+    
     if sort:
         train = train.sort_values(by=['id', 'date'])
         test = test.sort_values(by=['id', 'date'])
@@ -302,8 +306,8 @@ def save_split(file, X_tr, X_val, y_tr, y_val,num):
     
     
 def load_split(file, num):
-    return pd.read_hdf(file, 'X_tr', num), pd.read_hdf(file, 'X_tr', num), \
-           pd.read_hdf(file, 'y_tr', num), pd.read_hdf(file, 'y_val', num)
+    return pd.read_hdf(file, 'X_tr', num), pd.read_hdf(file, 'X_tr', num), 
+            pd.read_hdf(file, 'y_tr', num), pd.read_hdf(file, 'y_val', num)
 
 def cross_val(clf, X_train, aggregate_func, return_proba=False,
               splits=3, interval=0, train_size=0.75, verbose=True, splits_file=None):
