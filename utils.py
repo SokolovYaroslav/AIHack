@@ -184,15 +184,16 @@ def add_features(train, test, triang=False, rolling_window=[], sort=False):
     test['full_month'] = (test.date.dt.year - 2016)*12 + test.date.dt.month
     train['days'] = (train.date.dt.year-2016)*365+train.date.dt.dayofyear
     test['days'] = (test.date.dt.year-2016)*365+test.date.dt.dayofyear
-    train['time_weight'] = 1 / train.days
-    test['time_weight'] = 1 / test.days
+    max_day = train.days.max()
+    train['time_weight'] = 1 / (max_day - train.days + 1)
+    max_day = test.days.max()
+    test['time_weight'] = 1 / (max_day - test.days + 1)
     train['hour'] = -9999
     train.loc[~train.time.isnull(), 'hour'] = train.loc[~train.time.isnull(), 'time']\
                                           .apply(lambda x: x.split(':')[0].strip()).astype(int)
     test['hour'] = -9999
     test.loc[~test.time.isnull(), 'hour'] = test.loc[~test.time.isnull(), 'time']\
                                           .apply(lambda x: x.split(':')[0].strip()).astype(int)
-    max_day = train.days.max()
     days_last = train.groupby('id')['days'].apply(lambda df: max_day - df.iloc[-1])
     train = train.merge(days_last.reset_index().rename(columns={'days': 'days_since_last'}), on='id')
     days_last = test.groupby('id')['days'].apply(lambda df: max_day - df.iloc[-1])
